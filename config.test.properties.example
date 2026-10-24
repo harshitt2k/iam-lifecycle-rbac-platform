@@ -1,0 +1,5 @@
+# Copy to config.test.properties. Tests DROP and recreate this database every time,
+# so its name MUST end in _test (the test refuses to run otherwise).
+db.url=jdbc:mysql://localhost:3306/iam_platform_test
+db.user=root
+db.password=
