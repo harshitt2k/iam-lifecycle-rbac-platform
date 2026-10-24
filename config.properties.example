@@ -1,0 +1,3 @@
+db.url=jdbc:mysql://localhost:3306/iam_platform
+db.user=root
+db.password=

@@ -1,0 +1,12 @@
+target/
+.idea/
+.settings/
+.classpath
+.project
+*.class
+reports/
+config.properties
+src/main/resources/db.properties
+sql/01_schema.sql
+sql/02_seed.sql
+sql/03_audit_triggers.sql
