@@ -16,8 +16,18 @@ public final class DbConnection {
     private static final Properties PROPS = new Properties();
 
     static {
-        // -Diam.config=... lets the tests point at a different database
-        String path = System.getProperty("iam.config", "config.properties");
+        // Register the driver explicitly: inside Tomcat the jar sits in WEB-INF/lib, where
+        // DriverManager's automatic discovery can miss it.
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            throw new ExceptionInInitializerError("MySQL driver not found on the classpath");
+        }
+        // -Diam.config=... (or the IAM_CONFIG environment variable) points at another config file:
+        // the tests use it for the test database, Tomcat uses it to find config.properties.
+        String path = System.getProperty("iam.config");
+        if (path == null || path.isBlank()) path = System.getenv("IAM_CONFIG");
+        if (path == null || path.isBlank()) path = "config.properties";
         try (InputStream in = new FileInputStream(path)) {
             PROPS.load(in);
         } catch (IOException e) {

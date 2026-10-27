@@ -1,0 +1,815 @@
+{
+  "info": {
+    "name": "IAM Lifecycle & RBAC API",
+    "description": "Run the whole collection top to bottom (Runner). Each run hires a fresh employee, moves, grants, blocks a conflicting grant, and terminates. Requests use baseUrl = http://localhost:8081/iam-api/api",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"status ok\", function () { pm.expect(pm.response.json().status).to.eql(\"ok\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List employees",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"at least 20 employees\", function () { pm.expect(pm.response.json().length).to.be.at.least(20); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get S402 (has a DIRECT APPROVE_PAYMENT)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees/S402",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees",
+            "S402"
+          ]
+        },
+        "description": "Seeded problem: SoD violation plus direct access."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"S402 holds APPROVE_PAYMENT directly\", function () {",
+              "  const e = pm.response.json().entitlements.find(x => x.name === \"APPROVE_PAYMENT\");",
+              "  pm.expect(e.source).to.eql(\"DIRECT\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get unknown employee",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees/X999",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees",
+            "X999"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 404\", function () { pm.response.to.have.status(404); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Joiner - hire a new engineer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"employeeId\": \"{{newId}}\",\n  \"givenName\": \"Asha\",\n  \"familyName\": \"Rao\",\n  \"email\": \"{{newId}}@lab-corp.test\",\n  \"department\": \"Engineering\",\n  \"jobTitle\": \"Backend Engineer\",\n  \"supervisorId\": \"S101\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// a fresh id every run, so the whole collection can be run again and again",
+              "pm.collectionVariables.set(\"newId\", \"T\" + Math.floor(10000 + Math.random() * 90000));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 201\", function () { pm.response.to.have.status(201); });",
+              "pm.test(\"got the rule-based roles\", function () {",
+              "  const roles = pm.response.json().roles;",
+              "  pm.expect(roles).to.include(\"ENG_BASE\");",
+              "  pm.expect(roles).to.include(\"ENG_DEVELOPER\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Joiner - same id again is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"employeeId\": \"{{newId}}\",\n  \"givenName\": \"Asha\",\n  \"familyName\": \"Rao\",\n  \"email\": \"{{newId}}@lab-corp.test\",\n  \"department\": \"Engineering\",\n  \"jobTitle\": \"Backend Engineer\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 409\", function () { pm.response.to.have.status(409); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Joiner - missing fields",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"employeeId\": \"T1\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 400\", function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mover - move to Procurement",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees/{{newId}}/move",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees",
+            "{{newId}}",
+            "move"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"department\": \"Operations\",\n  \"jobTitle\": \"Procurement Officer\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"old access gone, new access in\", function () {",
+              "  const j = pm.response.json();",
+              "  pm.expect(j.roles).to.include(\"OPS_PROCUREMENT\");",
+              "  pm.expect(j.roles).to.not.include(\"ENG_DEVELOPER\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Grant DIRECT APPROVE_PAYMENT - blocked by SoD",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees/{{newId}}/entitlements",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees",
+            "{{newId}}",
+            "entitlements"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"entitlement\": \"APPROVE_PAYMENT\",\n  \"reason\": \"Postman SoD demo\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Procurement already holds CREATE_VENDOR, so this must be refused."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 409\", function () { pm.response.to.have.status(409); });",
+              "pm.test(\"reports the violation\", function () {",
+              "  pm.expect(pm.response.json().violations.length).to.eql(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Grant DIRECT JIRA_ACCESS - allowed",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees/{{newId}}/entitlements",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees",
+            "{{newId}}",
+            "entitlements"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"entitlement\": \"JIRA_ACCESS\",\n  \"reason\": \"Cross-team project\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 201\", function () { pm.response.to.have.status(201); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Revoke DIRECT JIRA_ACCESS",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees/{{newId}}/entitlements/JIRA_ACCESS?reason=project ended",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees",
+            "{{newId}}",
+            "entitlements",
+            "JIRA_ACCESS"
+          ],
+          "query": [
+            {
+              "key": "reason",
+              "value": "project ended"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leaver - terminate",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/employees/{{newId}}/leave",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "employees",
+            "{{newId}}",
+            "leave"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"exitedOn\": \"2026-10-26\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"terminated with no access left\", function () {",
+              "  const j = pm.response.json();",
+              "  pm.expect(j.employee.status).to.eql(\"TERMINATED\");",
+              "  pm.expect(j.roles.length).to.eql(0);",
+              "  pm.expect(j.entitlements.length).to.eql(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Report - who has access to what (CSV)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reports/access",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reports",
+            "access"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"is CSV\", function () { pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/csv\"); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Report - who has access to what (JSON)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reports/access?format=json",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reports",
+            "access"
+          ],
+          "query": [
+            {
+              "key": "format",
+              "value": "json"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Report - SoD violations",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reports/sod",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reports",
+            "sod"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"seeded violations are found\", function () { pm.expect(pm.response.json().count).to.be.at.least(2); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Report - excessive access",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/reports/excessive",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reports",
+            "excessive"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"seeded findings are found\", function () { pm.expect(pm.response.json().count).to.be.at.least(6); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit - the new employee's trail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/audit?employeeId={{newId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "audit"
+          ],
+          "query": [
+            {
+              "key": "employeeId",
+              "value": "{{newId}}"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+              "pm.test(\"joiner, mover, SoD block and leaver are all recorded\", function () {",
+              "  const actions = pm.response.json().entries.map(e => e.action);",
+              "  [\"JOINER\",\"MOVER\",\"SOD_BLOCKED\",\"LEAVER\"].forEach(a => pm.expect(actions).to.include(a));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit - latest 5 entries",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/audit?limit=5",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "audit"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081/iam-api/api"
+    },
+    {
+      "key": "newId",
+      "value": "T90001"
+    }
+  ]
+}

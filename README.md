@@ -4,7 +4,7 @@ A mini enterprise identity and access management (IAM) application written in pl
 
 It is the same set of problems an identity governance product such as SailPoint IdentityIQ solves, built by hand so every rule is visible in the code. The employee data comes from the same HR source that feeds my IdentityIQ lab, so both systems share one source of truth.
 
-> **Status:** v1 (console app, tests, CSV report) is complete. v2 (servlet API on Tomcat) and v3 (HTML/JS dashboard) are on the roadmap.
+> **Status:** v1 (console app, tests, CSV report) and v2 (REST API on Tomcat, Postman collection) are complete. v3 (HTML/JS dashboard) is next.
 
 ## Features
 
@@ -14,11 +14,12 @@ It is the same set of problems an identity governance product such as SailPoint 
 - **Excessive-access detection.** Finds direct (out-of-role) grants and terminated employees who still hold access.
 - **Append-only audit log.** Database triggers block `UPDATE` and `DELETE` on `audit_log`.
 - **"Who has access to what" CSV report** for reviewers and auditors.
-- **10 JUnit 5 tests** against a separate test database, including a transaction rollback test.
+- **REST API** on Tomcat 9 (port 8081) with a Postman collection that runs the whole lifecycle.
+- **JUnit 5 tests** against a separate test database, including a transaction rollback test and every API endpoint.
 
 ## Tech stack
 
-Java 17 (records, enums) · Maven · JDBC with `PreparedStatement` only · MySQL (XAMPP) · JUnit 5 · DAO pattern.
+Java 17 (records, enums) · Maven · JDBC with `PreparedStatement` only · MySQL (XAMPP) · JUnit 5 · DAO pattern · Servlet 4 on Tomcat 9 (no framework, no JSON library).
 
 ## Lifecycle rules
 
@@ -161,11 +162,42 @@ Each revoke and the `LEAVER` event is recorded with who, when and why.
 
 ### Tests
 
-10 tests pass: joiner, mover, leaver, unknown employee, SoD block, mid-workflow rollback, both detectors, revoke-clears-finding, and the CSV report.
+10 core tests pass: joiner, mover, leaver, unknown employee, SoD block, mid-workflow rollback, both detectors, revoke-clears-finding, and the CSV report. The v2 API adds a further 13 (JSON handling and every endpoint). The screenshot below was taken before they were added.
 
 ![Tests pass, part 1](Screenshots/06-tests-pass-part1.png)
 
 ![Tests pass, part 2](Screenshots/06-tests-pass-part2.png)
+
+## REST API (v2)
+
+The same services behind the console menu are exposed over HTTP. The API is a single servlet that hands every request to a plain Java router (`ApiRouter`), so each endpoint is also tested without a web server.
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/employees` | Joiner |
+| POST | `/employees/{id}/move` | Mover |
+| POST | `/employees/{id}/leave` | Leaver |
+| POST / DELETE | `/employees/{id}/entitlements[/{name}]` | Grant or revoke a DIRECT entitlement (SoD-checked, `409` on conflict) |
+| GET | `/employees`, `/employees/{id}` | Read employees with roles and entitlements |
+| GET | `/reports/access`, `/reports/sod`, `/reports/excessive` | Reports and scans |
+| GET | `/audit` | Audit trail |
+
+Full request and response examples are in [`docs/API.md`](docs/API.md).
+
+### Run it on Tomcat 9 (port 8081)
+
+The scripts in `deploy/tomcat/` create a second, separate Tomcat instance, so it can run next to any other Tomcat on the machine. Edit the paths at the top of each script first.
+
+1. Run `setup-iam-api-tomcat.bat` once.
+2. Build the WAR: `mvn clean package -DskipTests` (it produces `target/iam-api.war`).
+3. Run `deploy-war.bat`, then `start-iam-api.bat`.
+4. Open <http://localhost:8081/iam-api/api/health>.
+
+`start-iam-api.bat` passes `-Diam.config=...\config.properties`, so the API uses the same database settings as the console app.
+
+### Postman
+
+Import `postman/iam-api.postman_collection.json` and run the collection. It hires a new employee, moves them, tries a conflicting grant (blocked with `409`), terminates them, and reads the reports and the audit trail. Every request has tests, and each run uses a fresh employee id, so it can be run repeatedly.
 
 ## Project layout
 
@@ -180,9 +212,13 @@ src/main/java/com/iam/
   exception/  EmployeeNotFoundException, SoDViolationException
   util/       DbConnection, ConnectionFactory
   cli/        AppContext (wiring), Main (menu)
-src/test/java/com/iam/   TestDb, LifecycleServiceTest, DetectionTest
+  api/        ApiServlet (web adapter), ApiRouter (all endpoints), Json, ApiResponse
+src/main/webapp/          landing page (the v3 dashboard will live here)
+src/test/java/com/iam/    TestDb, LifecycleServiceTest, DetectionTest, ApiRouterTest, JsonTest
 sql/                      schema.sql, seed.sql
-docs/                     RULES.md
+deploy/tomcat/            scripts for the second Tomcat on port 8081
+postman/                  Postman collection
+docs/                     RULES.md, API.md
 ```
 
 Design notes:
@@ -215,5 +251,5 @@ Design notes:
 - [x] SoD and excessive-access detection
 - [x] CLI and CSV access report
 - [x] JUnit tests
-- [ ] v2: servlet API on Tomcat 9 (port 8081) with a Postman collection
+- [x] v2: servlet API on Tomcat 9 (port 8081) with a Postman collection
 - [ ] v3: HTML/JS dashboard
