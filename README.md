@@ -193,11 +193,19 @@ The scripts in `deploy/tomcat/` create a second, separate Tomcat instance, so it
 3. Run `deploy-war.bat`, then `start-iam-api.bat`.
 4. Open <http://localhost:8081/iam-api/api/health>.
 
+Tomcat must run on **Java 17**, because the code is compiled for it. `start-iam-api.bat` uses `JAVA_HOME` if it points to a JDK, and otherwise looks for a Temurin 17 under `C:\Program Files\Eclipse Adoptium`.
+
 `start-iam-api.bat` passes `-Diam.config=...\config.properties`, so the API uses the same database settings as the console app.
 
 ### Postman
 
 Import `postman/iam-api.postman_collection.json` and run the collection. It hires a new employee, moves them, tries a conflicting grant (blocked with `409`), terminates them, and reads the reports and the audit trail. Every request has tests, and each run uses a fresh employee id, so it can be run repeatedly.
+
+![Postman runner: 29 tests passed, 0 failed](Screenshots/07-postman-run.png)
+
+The conflicting grant is rejected with `409` and the violation is reported, while the allowed grant returns `201`:
+
+![SoD-blocked grant returns 409](Screenshots/08-api-sod-blocked.png)
 
 ## Project layout
 
