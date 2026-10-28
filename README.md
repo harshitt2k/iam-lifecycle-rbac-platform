@@ -4,7 +4,7 @@ A mini enterprise identity and access management (IAM) application written in pl
 
 It is the same set of problems an identity governance product such as SailPoint IdentityIQ solves, built by hand so every rule is visible in the code. The employee data comes from the same HR source that feeds my IdentityIQ lab, so both systems share one source of truth.
 
-> **Status:** v1 (console app, tests, CSV report) and v2 (REST API on Tomcat, Postman collection) are complete. v3 (HTML/JS dashboard) is next.
+> **Status:** v1 (console app, tests, CSV report) and v2 (REST API on Tomcat, Postman collection), and v3 (HTML/JS dashboard) are complete.
 
 ## Features
 
@@ -207,6 +207,21 @@ The conflicting grant is rejected with `409` and the violation is reported, whil
 
 ![SoD-blocked grant returns 409](Screenshots/08-api-sod-blocked.png)
 
+## Dashboard (v3)
+
+Once the API is running, open <http://localhost:8081/iam-api/>. The dashboard is a single static page (plain HTML, CSS and JavaScript, no framework) that calls the REST API, so it needs no extra server.
+
+- Summary cards for active and terminated employees, SoD violations and access findings.
+- Tabs for employees, the "who has access to what" report (with CSV download), SoD violations, excessive access and the audit log.
+- Click an employee to see roles and entitlements, grant or revoke a direct entitlement, move them, or terminate them. A grant that breaks a separation-of-duties rule is refused and the conflicting pair is shown.
+- **Hire** runs the Joiner flow. The "Acting as" box sets the `X-Actor` header, so the audit log shows who did what.
+
+![Dashboard with summary cards and the employee list](Screenshots/09-dashboard.png)
+
+Granting `CREATE_VENDOR` to a procurement officer who already holds `APPROVE_PAYMENT` is refused, and the conflicting pair is shown:
+
+![Dashboard showing a grant blocked by a separation-of-duties rule](Screenshots/10-dashboard-sod-blocked.png)
+
 ## Project layout
 
 ```
@@ -221,7 +236,7 @@ src/main/java/com/iam/
   util/       DbConnection, ConnectionFactory
   cli/        AppContext (wiring), Main (menu)
   api/        ApiServlet (web adapter), ApiRouter (all endpoints), Json, ApiResponse
-src/main/webapp/          landing page (the v3 dashboard will live here)
+src/main/webapp/          v3 dashboard (single static page)
 src/test/java/com/iam/    TestDb, LifecycleServiceTest, DetectionTest, ApiRouterTest, JsonTest
 sql/                      schema.sql, seed.sql
 deploy/tomcat/            scripts for the second Tomcat on port 8081
@@ -260,4 +275,4 @@ Design notes:
 - [x] CLI and CSV access report
 - [x] JUnit tests
 - [x] v2: servlet API on Tomcat 9 (port 8081) with a Postman collection
-- [ ] v3: HTML/JS dashboard
+- [x] v3: HTML/JS dashboard served by the same Tomcat
